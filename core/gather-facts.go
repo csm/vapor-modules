@@ -1,7 +1,7 @@
 package main
 import (
 	"github.com/csm/go-edn/types"
-	"vapor"
+	"github.com/csm/vapor-modules"
 	"runtime"
 	"net"
 	"container/list"
