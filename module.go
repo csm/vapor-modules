@@ -35,17 +35,3 @@ func RunModule(module Module) {
 	}
 	os.Exit(0)
 }
-
-type BoolType bool
-
-func (self BoolType) Equals(other types.Value) {
-	return self == other
-}
-
-func (self BoolType) String() string {
-	if self {
-		return "true"
-	} else {
-		return "false"
-	}
-}
