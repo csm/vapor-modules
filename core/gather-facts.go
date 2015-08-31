@@ -49,7 +49,9 @@ func (self GatherFacts) Exec(_ types.Value) (types.Value, error) {
 			case *net.IPNet:
 				var v4 = ip.IP.To4()
 				addrmap[types.Keyword("address")] = types.String(ip.IP.String())
-				addrmap[types.Keyword("prefix-length")] = types.Int(ip.Mask.Size())
+				size, bits := ip.Mask.Size()
+				addrmap[types.Keyword("prefix-length")] = types.Int(size)
+				addrmap[types.Keyword("bit-length")] = types.Int(bits)
 				if v4 != nil {
 					v4list.Insert(addrmap)
 				} else {
