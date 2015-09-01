@@ -1,34 +1,26 @@
 package main
 
 import (
-    "container/list"
     "github.com/csm/go-edn/types"
     "github.com/csm/vapor-modules"
-    "os/exec"
+    "bytes"
     "errors"
     "fmt"
-    "bytes"
+    "os/exec"
     "strings"
 )
 
-type Command struct{}
+type Shell struct{}
 
-func (this Command) Doc() string {
-	return "Run a command. Takes an input map containing at least :command, a list or vector specifying the command; the first element is the program to run, the rest are passed as arguments. No shell parsing or redirection is done. Optional arguments include :env, a map of environment variable names to values (by default, the environment the module is launched with is used); and :input, a string to pass to the command's stdandard input. Return value is a map containing whether the program ran successfully, its standard output and error, and information about the process that ran."
+func (this Shell) Doc() string {
+    return "Run a command with a shell. Input is a map that at least contains a :command argument, a string giving the command to run. Optional is the :shell argument, which can be the path of the shell to run; default is /bin/sh. :input may be set to a string, which will be sent to the shell's standard input. :env may be a map of environment variable names to values, which will be passed as the environment to the command."
 }
 
-func (this Command) TakesInput() bool {
+func (this Shell) TakesInput() bool {
     return true
 }
 
-// The command module takes as input a map, and runs that command.
-//
-// Parameters in the input map are:
-//   :command, a list or vector, giving the command to run. Required.
-//   :env, a map of names to values; if specified, these are added to the environment when running the command; optional
-//   :input, a string to pass to the command's stdin; optional
-func (this Command) Exec(input types.Value) (output types.Value, err error) {
-    var command []string
+func (this Shell) Exec(input types.Value) (output types.Value, err error) {
     var commandMap types.Map
     if m, ok := input.(types.Map); ok {
         commandMap = m
@@ -37,39 +29,30 @@ func (this Command) Exec(input types.Value) (output types.Value, err error) {
         return
     }
 
+    var command string
     var commandEntry = commandMap[types.Keyword("command")]
     if commandEntry == nil {
-        err = errors.New("require at least :command in input")
+        err = errors.New(":command argument is required")
         return
-    } else if l, ok := commandEntry.(*types.List); ok {
-        var list = (*list.List)(l)
-        command = make([]string, list.Len())
-        var i = 0
-        for e := list.Front(); e != nil; e = e.Next() {
-            if elem, ok := e.Value.(types.String); ok {
-                command[i] = string(elem)
-                i++
-            } else {
-                err = errors.New(":command must be a list of strings")
-                return
-            }
-        }
-    } else if v, ok := commandEntry.(types.Vector); ok {
-        var vect = ([]types.Value)(v)
-        command = make([]string, len(vect))
-        for i, e := range vect {
-            if elem, ok := e.(types.String); ok {
-                command[i] = string(elem)
-            } else {
-                err = errors.New(":command must be a vector of strings")
-                return
-            }
-        }
+    } else if c, ok := commandEntry.(types.String); ok {
+        command = string(c)
     } else {
-        err = errors.New("expected a list or vector as :command")
+        err = errors.New(":command must be a string")
         return
     }
-    var cmd = exec.Command(command[0], command[1:]...)
+
+    var shell = "/bin/sh"
+    shellEntry := commandMap[types.Keyword("shell")]
+    if shellEntry != nil {
+        if s, ok := shellEntry.(types.String); ok {
+            shell = string(s)
+        } else {
+            err = errors.New(":shell must be a string if specified")
+            return
+        }
+    }
+
+    cmd := exec.Command(shell, "-c", command)
 
     var envEntry = commandMap[types.Keyword("env")]
     if envEntry != nil {
@@ -98,13 +81,12 @@ func (this Command) Exec(input types.Value) (output types.Value, err error) {
         }
     }
 
-    var stdinEntry = commandMap[types.Keyword("input")]
-    if stdinEntry != nil {
-        if stdin, ok := stdinEntry.(types.String); ok {
-            cmd.Stdin = strings.NewReader(string(stdin))
+    inputEntry := commandMap[types.Keyword("input")]
+    if inputEntry != nil {
+        if i, ok := inputEntry.(types.String); ok {
+            cmd.Stdin = strings.NewReader(string(i))
         } else {
             err = errors.New(":input must be a string if specified")
-            return
         }
     }
 
@@ -135,5 +117,5 @@ func (this Command) Exec(input types.Value) (output types.Value, err error) {
 }
 
 func main() {
-    vapor.RunModule(Command{})
+    vapor.RunModule(Shell{})
 }

@@ -18,25 +18,21 @@ import (
 
 type HashFile struct{}
 
+func (this HashFile) Doc() string {
+    return "Hash a file on the host. Requires an input map containing at least :file, a string giving the path of the file to hash. :hash is optional, a string, keyword, or symbol naming the hash function to use; if no :hash is given, uses SHA-256."
+}
+
 func (this HashFile) TakesInput() bool {
     return true
 }
 
 func (this HashFile) Exec(input types.Value) (out types.Value, err error) {
-    defer func() {
-        if r := recover(); r != nil {
-            out = types.Map{
-                types.Keyword("success"): types.Bool(false),
-                types.Keyword("error"): types.String(fmt.Sprint(r)),
-            }
-        }
-    }()
     var inputMap types.Map
     if i, ok := input.(types.Map); ok {
         inputMap = i
     } else {
         err = errors.New(fmt.Sprintf("expected a map as input, got a %T", input))
-        panic(err)
+        return
     }
 
     var hashName string
@@ -51,7 +47,7 @@ func (this HashFile) Exec(input types.Value) (out types.Value, err error) {
         hashName = string(s)
     } else {
         err = errors.New(":hash must be a string, keyword, or symbol if specified")
-        panic(err)
+        return
     }
     hashName = strings.ToLower(hashName)
 
@@ -81,23 +77,23 @@ func (this HashFile) Exec(input types.Value) (out types.Value, err error) {
     var fileElem = inputMap[types.Keyword("file")]
     if fileElem == nil {
         err = errors.New(":file argument is required")
-        panic(err)
+        return
     } else if f, ok := fileElem.(types.String); ok {
         fileName = string(f)
     } else {
         err = errors.New(":file argument must be a string")
-        panic(err)
+        return
     }
 
     file, err := os.Open(fileName)
     if err != nil {
-        panic(err)
+        return
     }
     hashOut := bufio.NewWriterSize(hash, hash.BlockSize())
     wrote, err := io.Copy(hashOut, file)
     hashOut.Flush()
     if err != nil {
-        panic(err)
+        return
     }
     out = types.Map{
         types.Keyword("success"): types.Bool(true),
